@@ -12,6 +12,7 @@ from email.mime.text import MIMEText
 app = Flask(__name__)
 appareils_connus = {}
 derniers_appareils = []
+historique = []
 
 EMAIL = "sevanvo7@gmail.com"
 MOT_DE_PASSE = "xrlnscdlyzrlaiev"
@@ -53,7 +54,7 @@ Heure : {datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
         pass
 
 def scanner():
-    global derniers_appareils
+    global derniers_appareils, historique
     while True:
         arp = ARP(pdst="192.168.10.0/24")
         ether = Ether(dst="ff:ff:ff:ff:ff:ff")
@@ -77,6 +78,12 @@ def scanner():
                 'statut': 'NOUVEAU' if nouveau else 'Connu'
             })
         derniers_appareils = appareils
+        historique.append({
+            'heure': datetime.datetime.now().strftime("%H:%M:%S"),
+            'count': len(appareils)
+        })
+        if len(historique) > 20:
+            historique.pop(0)
         time.sleep(30)
 
 HTML = """
@@ -85,6 +92,7 @@ HTML = """
 <head>
     <title>Blue Team Scanner</title>
     <meta http-equiv="refresh" content="30">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { background: #0a0a0a; color: #00ff88; font-family: monospace; padding: 20px; }
         h1 { color: #00ccff; text-align: center; }
@@ -97,6 +105,7 @@ HTML = """
         .actif { color: #00ff88; }
         .inactif { color: #ff4444; }
         .header { text-align: center; color: #555; margin-bottom: 20px; }
+        .chart-container { width: 100%; max-width: 900px; margin: 40px auto; }
     </style>
 </head>
 <body>
@@ -122,16 +131,54 @@ HTML = """
         </tr>
         {% endfor %}
     </table>
+
+    <div class="chart-container">
+        <canvas id="graphique"></canvas>
+    </div>
+
+    <script>
+        const ctx = document.getElementById('graphique').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: {{ labels | safe }},
+                datasets: [{
+                    label: 'Appareils connectés',
+                    data: {{ data | safe }},
+                    borderColor: '#00ccff',
+                    backgroundColor: 'rgba(0, 204, 255, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#00ff88',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { labels: { color: '#00ff88' } }
+                },
+                scales: {
+                    x: { ticks: { color: '#555' }, grid: { color: '#111' } },
+                    y: { ticks: { color: '#555' }, grid: { color: '#111' }, beginAtZero: true }
+                }
+            }
+        });
+    </script>
 </body>
 </html>
 """
 
 @app.route('/')
 def index():
+    labels = [h['heure'] for h in historique]
+    data = [h['count'] for h in historique]
     return render_template_string(HTML,
         appareils=derniers_appareils,
         now=datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
-        count=len(derniers_appareils)
+        count=len(derniers_appareils),
+        labels=labels,
+        data=data
     )
 
 t = threading.Thread(target=scanner, daemon=True)
