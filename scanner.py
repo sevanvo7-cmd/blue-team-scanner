@@ -4,6 +4,7 @@ import requests
 import datetime
 import time
 import os
+import socket
 
 init()
 
@@ -17,6 +18,16 @@ def get_fabricant(mac):
         if r.status_code == 200:
             return r.text
         return "Inconnu"
+    except:
+        return "Inconnu"
+
+def ping(ip):
+    reponse = os.system(f"ping -n 1 -w 500 {ip} > nul 2>&1")
+    return "🟢 Actif" if reponse == 0 else "🔴 Inactif"
+
+def get_hostname(ip):
+    try:
+        return socket.gethostbyaddr(ip)[0]
     except:
         return "Inconnu"
 
@@ -43,23 +54,25 @@ def afficher(appareils):
 ╚══════════════════════════════════════════════╝
 """ + Style.RESET_ALL)
 
-    print(Fore.WHITE + f"{'IP':<20} {'MAC':<20} {'FABRICANT':<25} {'STATUT'}" + Style.RESET_ALL)
-    print("─" * 80)
+    print(Fore.WHITE + f"{'IP':<20} {'MAC':<20} {'FABRICANT':<25} {'NOM':<20} {'PING':<12} {'STATUT'}" + Style.RESET_ALL)
+    print("─" * 110)
 
     with open(LOG_FILE, "a") as log:
         for a in appareils:
             fabricant = get_fabricant(a['mac'])
+            etat_ping = ping(a['ip'])
+            hostname = get_hostname(a['ip'])
             nouveau = a['mac'] not in appareils_connus
 
             if nouveau:
                 statut = Fore.RED + "⚠ NOUVEAU" + Style.RESET_ALL
                 print('\a')
-                log.write(f"[{now}] NOUVEAU APPAREIL — IP: {a['ip']} MAC: {a['mac']} Fabricant: {fabricant}\n")
+                log.write(f"[{now}] NOUVEAU — IP: {a['ip']} MAC: {a['mac']} Nom: {hostname} Fabricant: {fabricant}\n")
                 appareils_connus[a['mac']] = a['ip']
             else:
                 statut = Fore.GREEN + "✅ Connu" + Style.RESET_ALL
 
-            print(f"{Fore.YELLOW}{a['ip']:<20}{Style.RESET_ALL} {a['mac']:<20} {Fore.BLUE}{fabricant:<25}{Style.RESET_ALL} {statut}")
+            print(f"{Fore.YELLOW}{a['ip']:<20}{Style.RESET_ALL} {a['mac']:<20} {Fore.BLUE}{fabricant:<25}{Style.RESET_ALL} {Fore.MAGENTA}{hostname:<20}{Style.RESET_ALL} {etat_ping:<12} {statut}")
 
     print(f"\n{Fore.CYAN}✅ {len(appareils)} appareil(s) — Prochain scan dans 30 secondes...{Style.RESET_ALL}")
 
