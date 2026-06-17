@@ -6,10 +6,15 @@ import os
 import datetime
 import threading
 import time
+import smtplib
+from email.mime.text import MIMEText
 
 app = Flask(__name__)
 appareils_connus = {}
 derniers_appareils = []
+
+EMAIL = "sevanvo7@gmail.com"
+MOT_DE_PASSE = "xrlnscdlyzrlaiev"
 
 def get_fabricant(mac):
     try:
@@ -27,6 +32,26 @@ def get_hostname(ip):
     except:
         return "Inconnu"
 
+def envoyer_alerte(ip, mac, fabricant, hostname):
+    try:
+        msg = MIMEText(f"""
+⚠ NOUVEL APPAREIL DÉTECTÉ
+
+IP : {ip}
+MAC : {mac}
+Fabricant : {fabricant}
+Nom : {hostname}
+Heure : {datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
+        """)
+        msg['Subject'] = f"⚠ Blue Team — Nouvel appareil : {ip}"
+        msg['From'] = EMAIL
+        msg['To'] = EMAIL
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as s:
+            s.login(EMAIL, MOT_DE_PASSE)
+            s.send_message(msg)
+    except:
+        pass
+
 def scanner():
     global derniers_appareils
     while True:
@@ -37,15 +62,20 @@ def scanner():
         for _, reponse in resultat:
             ip = reponse.psrc
             mac = reponse.hwsrc
+            fabricant = get_fabricant(mac)
+            hostname = get_hostname(ip)
+            nouveau = mac not in appareils_connus
+            if nouveau:
+                envoyer_alerte(ip, mac, fabricant, hostname)
+                appareils_connus[mac] = ip
             appareils.append({
                 'ip': ip,
                 'mac': mac,
-                'fabricant': get_fabricant(mac),
-                'hostname': get_hostname(ip),
+                'fabricant': fabricant,
+                'hostname': hostname,
                 'ping': ping(ip),
-                'statut': 'NOUVEAU' if mac not in appareils_connus else 'Connu'
+                'statut': 'NOUVEAU' if nouveau else 'Connu'
             })
-            appareils_connus[mac] = ip
         derniers_appareils = appareils
         time.sleep(30)
 
