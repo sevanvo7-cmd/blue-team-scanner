@@ -14,6 +14,7 @@ appareils_connus = {}
 derniers_appareils = []
 historique = []
 ip_bloquees = []
+logs = []
 
 EMAIL = "sevanvo7@gmail.com"
 MOT_DE_PASSE = "xrlnscdlyzrlaiev"
@@ -33,6 +34,12 @@ def get_hostname(ip):
         return socket.gethostbyaddr(ip)[0]
     except:
         return "Inconnu"
+
+def ajouter_log(message):
+    now = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+    logs.append(f"[{now}] {message}")
+    if len(logs) > 100:
+        logs.pop(0)
 
 def envoyer_alerte(ip, mac, fabricant, hostname):
     try:
@@ -57,9 +64,11 @@ Heure : {datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
 def bloquer_ip(ip):
     os.system(f'netsh advfirewall firewall add rule name="BLOCK_{ip}" dir=in action=block remoteip={ip}')
     os.system(f'netsh advfirewall firewall add rule name="BLOCK_{ip}" dir=out action=block remoteip={ip}')
+    ajouter_log(f"🚫 IP BLOQUÉE : {ip}")
 
 def debloquer_ip(ip):
     os.system(f'netsh advfirewall firewall delete rule name="BLOCK_{ip}"')
+    ajouter_log(f"✅ IP DÉBLOQUÉE : {ip}")
 
 def scanner():
     global derniers_appareils, historique
@@ -77,6 +86,7 @@ def scanner():
             if nouveau:
                 envoyer_alerte(ip, mac, fabricant, hostname)
                 appareils_connus[mac] = ip
+                ajouter_log(f"⚠ NOUVEL APPAREIL — IP: {ip} | MAC: {mac} | {fabricant} | {hostname}")
             appareils.append({
                 'ip': ip,
                 'mac': mac,
@@ -93,6 +103,7 @@ def scanner():
         })
         if len(historique) > 20:
             historique.pop(0)
+        ajouter_log(f"🔍 Scan terminé — {len(appareils)} appareil(s) détecté(s)")
         time.sleep(30)
 
 HTML = """
@@ -105,6 +116,7 @@ HTML = """
     <style>
         body { background: #0a0a0a; color: #00ff88; font-family: monospace; padding: 20px; }
         h1 { color: #00ccff; text-align: center; }
+        h2 { color: #00ccff; margin-top: 40px; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th { background: #111; color: #00ccff; padding: 10px; border: 1px solid #222; }
         td { padding: 10px; border: 1px solid #222; }
@@ -118,20 +130,20 @@ HTML = """
         .btn-bloquer { background: #ff4444; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; font-family: monospace; }
         .btn-debloquer { background: #00ff88; color: black; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; font-family: monospace; }
         .bloque { background: #1a0000; }
+        .logs { background: #050505; border: 1px solid #222; padding: 15px; max-height: 300px; overflow-y: auto; margin-top: 10px; }
+        .log-line { color: #555; font-size: 12px; margin: 3px 0; }
+        .log-line.alerte { color: #ff4444; }
+        .log-line.bloque { color: #ff8800; }
+        .log-line.scan { color: #00ccff; }
     </style>
 </head>
 <body>
     <h1>🔵 BLUE TEAM — SCANNER RÉSEAU</h1>
     <p class="header">Dernière mise à jour : {{ now }} — {{ count }} appareil(s) détecté(s)</p>
+
     <table>
         <tr>
-            <th>IP</th>
-            <th>MAC</th>
-            <th>Fabricant</th>
-            <th>Nom d'hôte</th>
-            <th>Ping</th>
-            <th>Statut</th>
-            <th>Action</th>
+            <th>IP</th><th>MAC</th><th>Fabricant</th><th>Nom d'hôte</th><th>Ping</th><th>Statut</th><th>Action</th>
         </tr>
         {% for a in appareils %}
         <tr class="{{ 'bloque' if a.bloque else '' }}">
@@ -160,6 +172,15 @@ HTML = """
 
     <div class="chart-container">
         <canvas id="graphique"></canvas>
+    </div>
+
+    <h2>📋 Logs en temps réel</h2>
+    <div class="logs">
+        {% for log in logs|reverse %}
+        <div class="log-line {% if '⚠' in log %}alerte{% elif '🚫' in log or '✅' in log %}bloque{% elif '🔍' in log %}scan{% endif %}">
+            {{ log }}
+        </div>
+        {% endfor %}
     </div>
 
     <script>
@@ -202,7 +223,8 @@ def index():
         now=datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S"),
         count=len(derniers_appareils),
         labels=labels,
-        data=data
+        data=data,
+        logs=logs
     )
 
 @app.route('/bloquer', methods=['POST'])
