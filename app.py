@@ -1,4 +1,4 @@
-from flask import Flask, render_template_string
+from flask import Flask, render_template_string, request, redirect
 from scapy.all import ARP, Ether, srp
 import requests
 import socket
@@ -13,6 +13,7 @@ app = Flask(__name__)
 appareils_connus = {}
 derniers_appareils = []
 historique = []
+ip_bloquees = []
 
 EMAIL = "sevanvo7@gmail.com"
 MOT_DE_PASSE = "xrlnscdlyzrlaiev"
@@ -53,6 +54,13 @@ Heure : {datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")}
     except:
         pass
 
+def bloquer_ip(ip):
+    os.system(f'netsh advfirewall firewall add rule name="BLOCK_{ip}" dir=in action=block remoteip={ip}')
+    os.system(f'netsh advfirewall firewall add rule name="BLOCK_{ip}" dir=out action=block remoteip={ip}')
+
+def debloquer_ip(ip):
+    os.system(f'netsh advfirewall firewall delete rule name="BLOCK_{ip}"')
+
 def scanner():
     global derniers_appareils, historique
     while True:
@@ -75,7 +83,8 @@ def scanner():
                 'fabricant': fabricant,
                 'hostname': hostname,
                 'ping': ping(ip),
-                'statut': 'NOUVEAU' if nouveau else 'Connu'
+                'statut': 'NOUVEAU' if nouveau else 'Connu',
+                'bloque': ip in ip_bloquees
             })
         derniers_appareils = appareils
         historique.append({
@@ -106,6 +115,9 @@ HTML = """
         .inactif { color: #ff4444; }
         .header { text-align: center; color: #555; margin-bottom: 20px; }
         .chart-container { width: 100%; max-width: 900px; margin: 40px auto; }
+        .btn-bloquer { background: #ff4444; color: white; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; font-family: monospace; }
+        .btn-debloquer { background: #00ff88; color: black; border: none; padding: 5px 10px; cursor: pointer; border-radius: 3px; font-family: monospace; }
+        .bloque { background: #1a0000; }
     </style>
 </head>
 <body>
@@ -119,15 +131,29 @@ HTML = """
             <th>Nom d'hôte</th>
             <th>Ping</th>
             <th>Statut</th>
+            <th>Action</th>
         </tr>
         {% for a in appareils %}
-        <tr>
+        <tr class="{{ 'bloque' if a.bloque else '' }}">
             <td>{{ a.ip }}</td>
             <td>{{ a.mac }}</td>
             <td>{{ a.fabricant }}</td>
             <td>{{ a.hostname }}</td>
             <td class="{{ 'actif' if '🟢' in a.ping else 'inactif' }}">{{ a.ping }}</td>
             <td class="{{ 'nouveau' if a.statut == 'NOUVEAU' else 'connu' }}">{{ a.statut }}</td>
+            <td>
+                {% if a.bloque %}
+                <form method="POST" action="/debloquer">
+                    <input type="hidden" name="ip" value="{{ a.ip }}">
+                    <button class="btn-debloquer">✅ Débloquer</button>
+                </form>
+                {% else %}
+                <form method="POST" action="/bloquer">
+                    <input type="hidden" name="ip" value="{{ a.ip }}">
+                    <button class="btn-bloquer">🚫 Bloquer</button>
+                </form>
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
     </table>
@@ -155,9 +181,7 @@ HTML = """
             },
             options: {
                 responsive: true,
-                plugins: {
-                    legend: { labels: { color: '#00ff88' } }
-                },
+                plugins: { legend: { labels: { color: '#00ff88' } } },
                 scales: {
                     x: { ticks: { color: '#555' }, grid: { color: '#111' } },
                     y: { ticks: { color: '#555' }, grid: { color: '#111' }, beginAtZero: true }
@@ -180,6 +204,22 @@ def index():
         labels=labels,
         data=data
     )
+
+@app.route('/bloquer', methods=['POST'])
+def bloquer():
+    ip = request.form.get('ip')
+    if ip and ip not in ip_bloquees:
+        ip_bloquees.append(ip)
+        bloquer_ip(ip)
+    return redirect('/')
+
+@app.route('/debloquer', methods=['POST'])
+def debloquer():
+    ip = request.form.get('ip')
+    if ip and ip in ip_bloquees:
+        ip_bloquees.remove(ip)
+        debloquer_ip(ip)
+    return redirect('/')
 
 t = threading.Thread(target=scanner, daemon=True)
 t.start()
