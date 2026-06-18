@@ -1,29 +1,25 @@
 # 🔵 Blue Team Network Scanner
 
-Outil de surveillance réseau développé en Python.
+Outil de cybersécurité défensive (Blue Team) développé en Python.
 
 ## Fonctionnalités
-- Scan automatique du réseau local toutes les 30 secondes
-- Identification des appareils via adresse IP et MAC
-- Détection des nouveaux appareils inconnus (alerte ⚠)
-- Identification du fabricant via API macvendors
-- Logs automatiques sauvegardés dans scan_log.txt
-- Affichage coloré en temps réel dans le terminal
+- Scanner réseau ARP automatique
+- Dashboard web sécurisé (Flask + authentification)
+- Score de menace par appareil (0-100)
+- Détection OS, vulnérabilités (EternalBlue, BlueKeep, RDP...)
+- Blocage IP via pare-feu Windows
+- Déconnexion forcée ARP Spoof
+- Alertes Telegram + email en temps réel
+- Détection nœuds Tor, VPN, MAC aléatoires
+- Export PDF / CSV / JSON
+- API REST, timeline, logs, SQLite
+- Thèmes, tags, notes, alertes personnalisées
 
 ## Technologies
-- Python 3.14
-- Scapy (scan réseau ARP)
-- Colorama (affichage couleur)
-- Requests (API fabricant MAC)
-- Npcap (driver réseau Windows)
+Python 3.14, Flask, Scapy, SQLite, Chart.js, Npcap
 
 ## Contexte
-Projet personnel développé dans le cadre de ma préparation au BTS CIEL option Cybersécurité (Ensitech Cergy, rentrée 2026). Objectif : cartographier un réseau local et détecter les intrusions en temps réel — compétence clé Blue Team.
-
-## Utilisation
-```bash
-py scanner.py
-```
+Projet personnel — préparation BTS CIEL Cybersécurité (Ensitech Cergy, 2026)
 
 ## Auteur
 Sevan Vienney-Osmandjian
